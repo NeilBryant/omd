@@ -1,7 +1,7 @@
 include ../../Makefile.omd
 
 NAME = icinga2
-VERSION = 2.3.2
+VERSION = 2.3.3
 DIR = $(NAME)-$(VERSION)
 
 .PHONY: skel
