@@ -13,7 +13,7 @@ BEGIN {
     use lib "$FindBin::Bin/lib/lib/perl5";
 }
 
-plan( tests => 16 );
+plan( tests => 35 );
 
 ##################################################
 # create our test site
@@ -22,6 +22,16 @@ my $site    = TestUtils::create_test_site() or TestUtils::bail_out_clean("no fur
 
 TestUtils::test_command({ cmd => $omd_bin." config $site set INFLUXDB on" });
 TestUtils::test_command({ cmd => $omd_bin." start $site", like => '/Starting influxdb...OK/' });
+#Create database
+TestUtils::test_command({ cmd => '/usr/bin/curl --noproxy localhost -G "http://localhost:8086/query" --data-urlencode "q=CREATE DATABASE mydb" --user root:root', like => '/\{"results":\[\{\}\]/', errlike => '/.*/'});
+#Insert dummy data
+TestUtils::test_command({ cmd => '/usr/bin/curl --noproxy localhost --user root:root -XPOST "http://localhost:8086/write" -d \'{    "database": "mydb",    "retentionPolicy": "default",    "points": [        {            "name": "cpu_load_short",            "tags": {                "host": "server01",                "region": "us-west"            },            "time": "2009-11-10T23:00:00Z",            "fields": {                "value": 0.64            }        }    ]}\'', errlike => '/.*/'});
+#Test dummy data
+TestUtils::test_command({ cmd => '/usr/bin/curl --noproxy localhost -G "http://localhost:8086/query" --data-urlencode "db=mydb" --data-urlencode "q=SELECT value FROM cpu_load_short WHERE region=\'us-west\'"', like => '/.*"name":"cpu_load_short".*/', errlike => '/.*/'});
+#Drop database
+TestUtils::test_command({ cmd => '/usr/bin/curl --noproxy localhost -G "http://localhost:8086/query" --data-urlencode "q=DROP DATABASE mydb" --user root:root', like => '/\{"results":\[\{\}\]/', errlike => '/.*/'});
+#Test if database is realy droped
+TestUtils::test_command({ cmd => '/usr/bin/curl --noproxy localhost -G "http://localhost:8086/query" --data-urlencode "db=mydb" --data-urlencode "q=SELECT value FROM cpu_load_short WHERE region=\'us-west\'"', like => '/.*database not found: mydb.*/', errlike => '/.*/'});
 TestUtils::test_command({ cmd => $omd_bin." stop $site" });
 TestUtils::remove_test_site($site);
 
